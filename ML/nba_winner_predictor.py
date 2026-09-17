@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
@@ -6,8 +7,9 @@ from sklearn.model_selection import train_test_split, TimeSeriesSplit
 from sklearn.metrics import accuracy_score, classification_report
 import joblib
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), 'Data')
-MODEL_PATH = os.path.join(os.path.dirname(__file__), 'nba_winner_model.joblib')
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = str(PROJECT_ROOT / 'Data')
+MODEL_PATH = str(Path(__file__).resolve().parent / 'nba_winner_model.joblib')
 
 TEAM_STATS_FILE = 'TeamStatistics.csv'
 TEAM_ADV_FILE = 'TeamStatisticsAdvanced.csv'

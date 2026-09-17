@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NBA Winner Predictor</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>🏀 NBA Winner Predictor</h1>
+      <p class="subtitle">GitHub Pages version • team matchup estimator</p>
+
+      <form id="predictionForm">
+        <div class="form-group">
+          <label for="homeTeam">Home Team</label>
+          <select id="homeTeam" required>
+            <option value="">Select home team...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="awayTeam">Away Team</label>
+          <select id="awayTeam" required>
+            <option value="">Select away team...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="gameDate">Game Date (Optional)</label>
+          <input type="date" id="gameDate" />
+        </div>
+
+        <button type="submit">Predict Winner</button>
+      </form>
+
+      <div id="loading" class="loading" aria-live="polite">
+        <div class="spinner"></div>
+        <div>Running matchup model...</div>
+      </div>
+
+      <div id="result" class="result" aria-live="polite">
+        <div class="prediction" id="predictionText">Prediction</div>
+        <div class="probability">
+          <div class="prob-box">
+            <div class="prob-team" id="homeProbLabel">Home Win</div>
+            <div class="prob-value" id="homeProbability">0%</div>
+          </div>
+          <div class="prob-box">
+            <div class="prob-team" id="awayProbLabel">Away Win</div>
+            <div class="prob-value" id="awayProbability">0%</div>
+          </div>
+        </div>
+        <div class="explanation">
+          <h3>Top factors</h3>
+          <ul id="explanationList"></ul>
+        </div>
+      </div>
+
+      <div id="errorBox" class="error" style="display: none"></div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
