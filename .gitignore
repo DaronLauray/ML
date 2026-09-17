@@ -1,0 +1,11 @@
+.venv/
+sklearn-env/
+__pycache__/
+.ipynb_checkpoints/
+*.pyc
+*.pyo
+*.joblib
+*.parquet
+Data/
+!model_export.json
+!team_profiles.json

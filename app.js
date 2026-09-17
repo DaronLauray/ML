@@ -1,85 +1,110 @@
-const teamList = [
-  'Atlanta Hawks',
-  'Boston Celtics',
-  'Brooklyn Nets',
-  'Charlotte Hornets',
-  'Chicago Bulls',
-  'Cleveland Cavaliers',
-  'Dallas Mavericks',
-  'Denver Nuggets',
-  'Detroit Pistons',
-  'Golden State Warriors',
-  'Houston Rockets',
-  'Indiana Pacers',
-  'LA Clippers',
-  'Los Angeles Lakers',
-  'Memphis Grizzlies',
-  'Miami Heat',
-  'Milwaukee Bucks',
-  'Minnesota Timberwolves',
-  'New Orleans Pelicans',
-  'New York Knicks',
-  'Oklahoma City Thunder',
-  'Orlando Magic',
-  'Philadelphia 76ers',
-  'Phoenix Suns',
-  'Portland Trail Blazers',
-  'Sacramento Kings',
-  'San Antonio Spurs',
-  'Seattle SuperSonics',
-  'Toronto Raptors',
-  'Utah Jazz',
-  'Washington Wizards'
-];
+let modelData = null;
+let teamProfiles = null;
 
-function populateTeams() {
-  const homeSelect = document.getElementById('homeTeam');
-  const awaySelect = document.getElementById('awayTeam');
-
-  const sortedTeams = [...teamList].sort((a, b) => a.localeCompare(b));
-
-  sortedTeams.forEach((team) => {
-    const homeOption = document.createElement('option');
-    homeOption.value = team;
-    homeOption.textContent = team;
-    homeSelect.appendChild(homeOption);
-
-    const awayOption = document.createElement('option');
-    awayOption.value = team;
-    awayOption.textContent = team;
-    awaySelect.appendChild(awayOption);
-  });
+function normalizeTeamName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
-function hashString(value) {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+function findProfileKey(teamName, profileMap) {
+  const target = normalizeTeamName(teamName);
+  if (!target) {
+    return null;
   }
-  return hash;
+
+  const exact = Object.keys(profileMap).find((key) => normalizeTeamName(key) === target);
+  if (exact) {
+    return exact;
+  }
+
+  return Object.keys(profileMap).find((key) => {
+    const keyName = normalizeTeamName(key);
+    return keyName.includes(target) || target.includes(keyName);
+  }) || null;
 }
 
-function getStaticPrediction(homeTeam, awayTeam, gameDate) {
-  const homeSeed = hashString(homeTeam);
-  const awaySeed = hashString(awayTeam);
-  const dateSeed = gameDate ? hashString(gameDate) : 0;
+async function loadStaticModel() {
+  if (modelData && teamProfiles) {
+    return;
+  }
 
-  const weightedScore = ((homeSeed % 1000) - (awaySeed % 1000)) / 10;
-  const dateBoost = (dateSeed % 100) / 100;
-  const baseHomeChance = 0.5 + weightedScore / 100 + dateBoost * 0.1 + 0.08;
+  const [modelResponse, teamsResponse] = await Promise.all([
+    fetch('model_export.json'),
+    fetch('team_profiles.json')
+  ]);
 
-  const homeProbability = Math.max(0.15, Math.min(0.85, baseHomeChance));
-  const awayProbability = 1 - homeProbability;
+  if (!modelResponse.ok || !teamsResponse.ok) {
+    throw new Error('The deployed Pages model files could not be loaded.');
+  }
+
+  modelData = await modelResponse.json();
+  teamProfiles = await teamsResponse.json();
+}
+
+function evaluateTree(treeNodes, featureRow, nodeIndex = 0) {
+  const node = treeNodes[nodeIndex];
+
+  if (node.is_leaf) {
+    const value = node.value || [0, 0];
+    const total = value.reduce((sum, item) => sum + Number(item || 0), 0) || 1;
+    return [
+      Number(value[0] || 0) / total,
+      Number(value[1] || 0) / total
+    ];
+  }
+
+  const featureName = modelData.feature_names[node.feature_index];
+  const value = Number(featureRow[featureName] ?? 0);
+  const nextIndex = value <= node.threshold ? node.left : node.right;
+  return evaluateTree(treeNodes, featureRow, nextIndex);
+}
+
+function getStaticPrediction(homeTeam, awayTeam) {
+  if (!modelData || !teamProfiles) {
+    throw new Error('The model has not finished loading.');
+  }
+
+  const homeProfileKey = findProfileKey(homeTeam, teamProfiles);
+  const awayProfileKey = findProfileKey(awayTeam, teamProfiles);
+
+  if (!homeProfileKey || !awayProfileKey) {
+    throw new Error(`Could not find team data for ${homeTeam} or ${awayTeam}.`);
+  }
+
+  const featureRow = {};
+  modelData.feature_names.forEach((featureName) => {
+    const baseFeature = featureName.replace(/^diff_/, '');
+    const homeValue = Number(teamProfiles[homeProfileKey][baseFeature] || 0);
+    const awayValue = Number(teamProfiles[awayProfileKey][baseFeature] || 0);
+    featureRow[featureName] = homeValue - awayValue;
+  });
+
+  let homeProbability = 0;
+  let awayProbability = 0;
+
+  modelData.trees.forEach((treeNodes) => {
+    const probabilities = evaluateTree(treeNodes, featureRow, 0);
+    homeProbability += probabilities[1];
+    awayProbability += probabilities[0];
+  });
+
+  homeProbability /= modelData.trees.length || 1;
+  awayProbability /= modelData.trees.length || 1;
+
   const prediction = homeProbability >= awayProbability ? homeTeam : awayTeam;
 
-  const explanation = [
-    `Home-court edge: ${(0.08 * 100).toFixed(1)}% boost`,
-    `Recent form index: ${((homeProbability - 0.5) * 100).toFixed(1)} pts`,
-    `Matchup strength: ${Math.abs(weightedScore).toFixed(1)}`,
-    `Date signal: ${(dateBoost * 100).toFixed(0)}%`,
-    `Estimated pace differential: ${((homeSeed % 17) - (awaySeed % 17)).toFixed(0)} pace`,
-    `Model confidence: ${homeProbability >= awayProbability ? 'Home side favored' : 'Away side favored'}`
-  ];
+  const featureDiffs = [...modelData.feature_names]
+    .map((featureName) => ({
+      name: featureName.replace(/^diff_/, ''),
+      value: Math.abs(Number(featureRow[featureName] || 0))
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6);
+
+  const explanation = featureDiffs.map((item) => `${item.name}: ${Number(featureRow[`diff_${item.name}`] || 0).toFixed(2)}`);
 
   return {
     prediction,
@@ -127,7 +152,27 @@ function setResult(data) {
   });
 }
 
-function handleSubmit(event) {
+async function populateTeams() {
+  await loadStaticModel();
+
+  const homeSelect = document.getElementById('homeTeam');
+  const awaySelect = document.getElementById('awayTeam');
+  const sortedTeams = Object.keys(teamProfiles).sort((a, b) => a.localeCompare(b));
+
+  sortedTeams.forEach((team) => {
+    const homeOption = document.createElement('option');
+    homeOption.value = team;
+    homeOption.textContent = team;
+    homeSelect.appendChild(homeOption);
+
+    const awayOption = document.createElement('option');
+    awayOption.value = team;
+    awayOption.textContent = team;
+    awaySelect.appendChild(awayOption);
+  });
+}
+
+async function handleSubmit(event) {
   event.preventDefault();
   hideError();
 
@@ -148,6 +193,7 @@ function handleSubmit(event) {
   showLoading(true);
 
   try {
+    await loadStaticModel();
     const data = getStaticPrediction(homeTeam, awayTeam, gameDate);
     setResult(data);
   } catch (error) {
