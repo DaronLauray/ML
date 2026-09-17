@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NBA Winner Predictor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        select, input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+        .result.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .prediction {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .probability {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .prob-box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e0e0e0;
+        }
+        .prob-team {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .prob-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        .explanation {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .explanation h3 {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .explanation ul {
+            list-style: none;
+            font-size: 13px;
+            color: #666;
+        }
+        .explanation li {
+            padding: 5px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        .explanation li:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+        }
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 4px solid #c33;
+        }
+        .loading {
+            text-align: center;
+            color: #667eea;
+            display: none;
+        }
+        .loading.show {
+            display: block;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏀 NBA Winner Predictor</h1>
+        <p class="subtitle">AI-powered prediction based on team statistics</p>
+        
+        <form id="predictionForm">
+            <div class="form-group">
+                <label for="homeTeam">Home Team</label>
+                <select id="homeTeam" required>
+                    <option value="">Select home team...</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="awayTeam">Away Team</label>
+                <select id="awayTeam" required>
+                    <option value="">Select away team...</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="gameDate">Game Date (Optional)</label>
+                <input type="date" id="gameDate">
+            </div>
+            
+            <button type="submit">Predict Winner</button>
+        </form>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Analyzing game matchup...</p>
+        </div>
+        
+        <div class="result" id="result">
+            <div class="prediction" id="prediction"></div>
+            <div class="probability">
+                <div class="prob-box">
+                    <div class="prob-team" id="homeTeamDisplay"></div>
+                    <div class="prob-value" id="homeProb"></div>
+                </div>
+                <div class="prob-box">
+                    <div class="prob-team" id="awayTeamDisplay"></div>
+                    <div class="prob-value" id="awayProb"></div>
+                </div>
+            </div>
+            <div class="explanation">
+                <h3>Top Contributing Factors:</h3>
+                <ul id="explanationList"></ul>
+            </div>
+            <div class="error" id="error" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const teams = {{ teams|tojson }};
+        
+        // Populate team dropdowns
+        function populateTeams() {
+            const homeSelect = document.getElementById('homeTeam');
+            const awaySelect = document.getElementById('awayTeam');
+            
+            teams.forEach(team => {
+                const opt1 = document.createElement('option');
+                opt1.value = team;
+                opt1.text = team;
+                homeSelect.appendChild(opt1);
+                
+                const opt2 = document.createElement('option');
+                opt2.value = team;
+                opt2.text = team;
+                awaySelect.appendChild(opt2);
+            });
+        }
+        
+        // Handle form submission
+        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const homeTeam = document.getElementById('homeTeam').value;
+            const awayTeam = document.getElementById('awayTeam').value;
+            const gameDate = document.getElementById('gameDate').value || null;
+            
+            if (homeTeam === awayTeam) {
+                showError('Home and away teams must be different');
+                return;
+            }
+            
+            showLoading(true);
+            
+            try {
+                const response = await fetch('/api/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        home_team: homeTeam,
+                        away_team: awayTeam,
+                        date: gameDate
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showError(data.error || 'Prediction failed');
+                    return;
+                }
+                
+                displayResult(data);
+            } catch (error) {
+                showError('Error: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        });
+        
+        function displayResult(data) {
+            document.getElementById('prediction').textContent = 
+                `${data.prediction} will likely WIN`;
+            document.getElementById('homeTeamDisplay').textContent = data.home_team;
+            document.getElementById('homeProb').textContent = 
+                (data.home_probability * 100).toFixed(1) + '%';
+            document.getElementById('awayTeamDisplay').textContent = data.away_team;
+            document.getElementById('awayProb').textContent = 
+                (data.away_probability * 100).toFixed(1) + '%';
+            
+            const explanationList = document.getElementById('explanationList');
+            explanationList.innerHTML = '';
+            data.explanation.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item;
+                explanationList.appendChild(li);
+            });
+            
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('result').classList.add('show');
+        }
+        
+        function showError(message) {
+            document.getElementById('error').textContent = message;
+            document.getElementById('error').style.display = 'block';
+        }
+        
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('show', show);
+        }
+        
+        // Initialize
+        populateTeams();
+    </script>
+</body>
+</html>
